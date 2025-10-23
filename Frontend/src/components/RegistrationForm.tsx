@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { ref, set } from 'firebase/database';
-import { db } from '../firebase.ts';
+// Using server-side registration endpoint instead of direct RTDB writes
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { signOut } from 'firebase/auth';
@@ -150,36 +149,84 @@ const RegistrationForm = () => {
       }
 
       const payload: any = {
+        teamName: teamName.trim(),
         members: finalMembers,
+        createdAt: new Date().toISOString(),
       };
 
-      await set(ref(db, 'teams/' + teamName), payload);
+      // Use environment variable VITE_REGISTER_ENDPOINT for the function URL or fallback to relative path
+      const endpoint = (import.meta as any).env.VITE_REGISTER_ENDPOINT || '/api/registerTeam';
 
-      toast.success('Team Registered Successfully!');
+      // Get ID token for auth (if available)
+      const token = await auth.currentUser?.getIdToken();
 
-      setTeamName('');
-      const emptyMember: Member = {
-        name: '',
-        regNo: '',
-        year: '',
-        dept: '',
-        residenceType: 'Day Scholar',
-        hostelName: '',
-        roomNumber: '',
-        wardenName: '',
-        wardenPhone: '',
-      };
+      const res = await postWithRetry(endpoint, payload, token);
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        toast.error('Registration failed: ' + (text || res.statusText));
+      } else {
+        toast.success('Team Registered Successfully!');
 
-      setLeader(emptyMember);
-      setMember1(emptyMember);
-      setMember2(emptyMember);
-      setMember3(emptyMember);
-      setMember4(emptyMember);
-    } catch (error) {
+        setTeamName('');
+        const emptyMember: Member = {
+          name: '',
+          regNo: '',
+          year: '',
+          dept: '',
+          residenceType: 'Day Scholar',
+          hostelName: '',
+          roomNumber: '',
+          wardenName: '',
+          wardenPhone: '',
+        };
+
+        setLeader(emptyMember);
+        setMember1(emptyMember);
+        setMember2(emptyMember);
+        setMember3(emptyMember);
+        setMember4(emptyMember);
+      }
+    } catch (error: any) {
+      console.error('Registration error', error);
       toast.error('Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // POST helper with exponential backoff retries
+  const postWithRetry = async (url: string, body: any, idToken?: string) => {
+    const maxAttempts = 5;
+    const baseDelay = 400; // ms
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (res.ok || (res.status >= 400 && res.status < 500)) {
+          // If success OR client error, stop retrying and return response
+          return res;
+        }
+
+        // For server errors (5xx), fallthrough to retry
+        const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 100;
+        await new Promise((r) => setTimeout(r, delay));
+      } catch (err) {
+        // Network or CORS error: retry
+        const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 100;
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+
+    // If all attempts failed, return a fake Response-like object
+    return new Response(null, { status: 503, statusText: 'Service Unavailable' });
   };
 
   const renderMemberFields = (
