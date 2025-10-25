@@ -26,19 +26,33 @@ body {
   border: 1px solid rgba(0, 212, 255, 0.18);
   box-shadow: 0 8px 32px 0 rgba(0, 212, 255, 0.1);
   border-radius: 16px;
-  padding: 2rem;
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .glass-card {
+    padding: 2rem;
+  }
 }
 
 .glow-input {
   background: rgba(0, 20, 50, 0.7);
   border: 1px solid #007bff;
   color: #e0f7fa;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-radius: 8px;
   width: 100%;
   font-family: 'Poppins', sans-serif;
   transition: all 0.3s ease;
   outline: none;
+  font-size: 14px;
+}
+
+@media (min-width: 640px) {
+  .glow-input {
+    padding: 12px 16px;
+    font-size: 16px;
+  }
 }
 
 .glow-input:focus {
@@ -56,14 +70,24 @@ body {
   color: #020024;
   font-family: 'Orbitron', sans-serif;
   font-weight: 700;
-  padding: 12px 32px;
+  padding: 10px 20px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-size: 16px;
+  font-size: 14px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .glow-btn {
+    padding: 12px 32px;
+    font-size: 16px;
+    letter-spacing: 1px;
+    width: auto;
+  }
 }
 
 .glow-btn:hover {

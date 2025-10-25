@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ref, get, set } from 'firebase/database';
-import { db, auth } from '../firebase.ts';
+import { ref, set, get } from 'firebase/database';
+import { db } from '../firebase.ts';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { signOut } from 'firebase/auth';
+import { auth } from '../firebase.ts';
 import { useNavigate } from 'react-router-dom';
 
 interface Member {
@@ -11,6 +12,7 @@ interface Member {
   regNo: string;
   year: string;
   dept: string;
+  phone: string;
   residenceType?: 'Day Scholar' | 'Hosteller';
   hostelName?: string;
   roomNumber?: string;
@@ -28,6 +30,7 @@ const RegistrationForm4 = () => {
     regNo: '',
     year: '',
     dept: '',
+    phone: '',
     residenceType: 'Day Scholar',
     hostelName: '',
     roomNumber: '',
@@ -40,6 +43,7 @@ const RegistrationForm4 = () => {
     regNo: '',
     year: '',
     dept: '',
+    phone: '',
     residenceType: 'Day Scholar',
     hostelName: '',
     roomNumber: '',
@@ -52,6 +56,7 @@ const RegistrationForm4 = () => {
     regNo: '',
     year: '',
     dept: '',
+    phone: '',
     residenceType: 'Day Scholar',
     hostelName: '',
     roomNumber: '',
@@ -64,6 +69,7 @@ const RegistrationForm4 = () => {
     regNo: '',
     year: '',
     dept: '',
+    phone: '',
     residenceType: 'Day Scholar',
     hostelName: '',
     roomNumber: '',
@@ -76,7 +82,34 @@ const RegistrationForm4 = () => {
     field: keyof Member,
     value: string
   ) => {
-    memberSetter((prev) => ({ ...prev, [field]: value }));
+    if (field === 'name') {
+      const capitalized = value
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      memberSetter(prev => ({ ...prev, [field]: capitalized }));
+    } else if (field === 'dept') {
+      memberSetter(prev => ({ ...prev, [field]: value.toUpperCase() }));
+    } else if (field === 'phone' || field === 'wardenPhone') {
+      // Only allow numeric input for phone numbers
+      const numericValue = value.replace(/[^0-9]/g, '');
+      if (numericValue.length <= 10) {
+        memberSetter(prev => ({ ...prev, [field]: numericValue }));
+      }
+    } else if (field === 'regNo' || field === 'roomNumber') {
+      // Only allow numeric input for registration number and room number
+      const numericValue = value.replace(/[^0-9]/g, '');
+      memberSetter(prev => ({ ...prev, [field]: numericValue }));
+    } else if (field === 'year') {
+      // Only allow numeric input for year
+      const numericValue = value.replace(/[^0-9]/g, '');
+      if (numericValue.length <= 1) {
+        memberSetter(prev => ({ ...prev, [field]: numericValue }));
+      }
+    } else {
+      memberSetter(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleLogout = async () => {
@@ -131,8 +164,12 @@ const RegistrationForm4 = () => {
 
     for (let i = 0; i < members.length; i++) {
       const member = members[i];
-      if (!member.name || !member.regNo || !member.year || !member.dept) {
+      if (!member.name || !member.regNo || !member.year || !member.dept || !member.phone) {
         toast.error(`Please fill all fields for ${i === 0 ? 'Team Leader' : `Member ${i}`}`);
+        return;
+      }
+      if (member.phone.length !== 10) {
+        toast.error(`Please enter a valid 10-digit phone number for ${i === 0 ? 'Team Leader' : `Member ${i}`}`);
         return;
       }
     }
@@ -229,19 +266,18 @@ const RegistrationForm4 = () => {
         }
 
         setTeamName('');
-        const emptyMember: Member = {
-          name: '',
-          regNo: '',
-          year: '',
-          dept: '',
-          residenceType: 'Day Scholar',
-          hostelName: '',
-          roomNumber: '',
-          wardenName: '',
-          wardenPhone: '',
-        };
-
-        setLeader(emptyMember);
+  const emptyMember: Member = {
+    name: '',
+    regNo: '',
+    year: '',
+    dept: '',
+    phone: '',
+    residenceType: 'Day Scholar',
+    hostelName: '',
+    roomNumber: '',
+    wardenName: '',
+    wardenPhone: ''
+  };        setLeader(emptyMember);
         setMember1(emptyMember);
         setMember2(emptyMember);
         setMember3(emptyMember);
@@ -274,6 +310,8 @@ const RegistrationForm4 = () => {
         />
         <input
           type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
           placeholder="Register Number"
           className="glow-input"
           value={member.regNo}
@@ -290,11 +328,22 @@ const RegistrationForm4 = () => {
         />
         <input
           type="text"
-          placeholder="Department"
+          placeholder="DEPARTMENT"
           className="glow-input"
-          value={member.dept}
-          onChange={(e) => handleMemberChange(setter, 'dept', e.target.value)}
+          value={member.dept.toUpperCase()}
+          onChange={(e) => handleMemberChange(setter, 'dept', e.target.value.toUpperCase())}
           required
+          style={{ textTransform: 'uppercase' }}
+        />
+        <input
+          type="tel"
+          placeholder="Phone Number"
+          className="glow-input"
+          value={member.phone}
+          onChange={(e) => handleMemberChange(setter, 'phone', e.target.value)}
+          required
+          pattern="[0-9]{10}"
+          maxLength={10}
         />
         <select
           className="glow-input"
@@ -324,6 +373,8 @@ const RegistrationForm4 = () => {
             />
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               placeholder="Room Number"
               className="glow-input"
               value={member.roomNumber}
