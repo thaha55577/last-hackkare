@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/HACKARE_3.0-registration/',
+  base: '/',
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
