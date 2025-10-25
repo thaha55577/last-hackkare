@@ -1,11 +1,9 @@
 import { useState } from 'react';
-// Using server-side registration endpoint or fallback to direct RTDB writes
-import { ref, set as dbSet } from 'firebase/database';
-import { db } from '../firebase.ts';
+import { ref, get, set } from 'firebase/database';
+import { db, auth } from '../firebase.ts';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { signOut } from 'firebase/auth';
-import { auth } from '../firebase.ts';
 import { useNavigate } from 'react-router-dom';
 
 interface Member {
@@ -20,7 +18,7 @@ interface Member {
   wardenPhone?: string;
 }
 
-const RegistrationForm = () => {
+const RegistrationForm4 = () => {
   const navigate = useNavigate();
   const [teamName, setTeamName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,7 +47,6 @@ const RegistrationForm = () => {
     wardenPhone: '',
   });
 
-
   const [member2, setMember2] = useState<Member>({
     name: '',
     regNo: '',
@@ -63,18 +60,6 @@ const RegistrationForm = () => {
   });
 
   const [member3, setMember3] = useState<Member>({
-    name: '',
-    regNo: '',
-    year: '',
-    dept: '',
-    residenceType: 'Day Scholar',
-    hostelName: '',
-    roomNumber: '',
-    wardenName: '',
-    wardenPhone: '',
-  });
-
-  const [member4, setMember4] = useState<Member>({
     name: '',
     regNo: '',
     year: '',
@@ -104,130 +89,6 @@ const RegistrationForm = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!teamName.trim()) {
-      toast.error('Please enter a team name');
-      return;
-    }
-
-    const members = [leader, member1, member2, member3, member4];
-
-    for (let i = 0; i < members.length; i++) {
-      const member = members[i];
-      // Member 4 is optional: index 4 corresponds to member4
-      if (i === 4) {
-        // if all fields empty, skip validation for member4
-        if (!member.name && !member.regNo && !member.year && !member.dept) {
-          continue;
-        }
-      }
-
-      if (!member.name || !member.regNo || !member.year || !member.dept) {
-        toast.error(`Please fill all fields for ${i === 0 ? 'Team Leader' : `Member ${i}`}`);
-        return;
-      }
-    }
-
-    // Validate per-member hostel details for members who selected Hosteller
-    for (let i = 0; i < members.length; i++) {
-      const m = members[i];
-      if (m.residenceType === 'Hosteller') {
-        if (!m.hostelName || !m.roomNumber || !m.wardenName || !m.wardenPhone) {
-          toast.error(`Please fill all hostel fields for ${i === 0 ? 'Team Leader' : `Member ${i}`}`);
-          return;
-        }
-      }
-    }
-
-    setLoading(true);
-
-    try {
-      // Remove empty member4 if all fields empty
-      let finalMembers = members;
-      if (!members[4].name && !members[4].regNo && !members[4].year && !members[4].dept) {
-        finalMembers = members.slice(0, 4);
-      }
-
-      const payload: any = {
-        teamName: teamName.trim(),
-        members: finalMembers,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Determine endpoint respecting Vite BASE_URL and env override
-      const env = (import.meta as any).env || {};
-      const endpoint = env.VITE_REGISTER_ENDPOINT || `${env.BASE_URL ?? '/'}api/registerTeam`;
-      const useDirect = !env.VITE_REGISTER_ENDPOINT;
-
-      // Get ID token for auth (if available)
-      const token = await auth.currentUser?.getIdToken();
-
-      let didSave = false;
-
-      if (useDirect) {
-        // No endpoint configured — write directly to RTDB
-        try {
-          await dbSet(ref(db, 'teams/' + teamName.trim()), { members: finalMembers, createdAt: Date.now() });
-          didSave = true;
-        } catch (err) {
-          console.error('Direct DB write failed', err);
-          toast.error('Registration failed: could not save to database');
-        }
-      } else {
-        // Try server endpoint first
-        const res = await postWithRetry(endpoint, payload, token);
-        if (!res.ok) {
-          const text = await res.text().catch(() => '');
-          // If server unavailable, attempt direct DB write as fallback
-          if (res.status === 503) {
-            try {
-              await dbSet(ref(db, 'teams/' + teamName.trim()), { members: finalMembers, createdAt: Date.now() });
-              didSave = true;
-            } catch (err) {
-              console.error('Fallback DB write failed', err);
-              toast.error('Registration failed: ' + (text || res.statusText));
-            }
-          } else {
-            toast.error('Registration failed: ' + (text || res.statusText));
-          }
-        } else {
-          didSave = true;
-        }
-      }
-
-      if (didSave) {
-        toast.success('Team Registered Successfully!');
-
-        setTeamName('');
-        const emptyMember: Member = {
-          name: '',
-          regNo: '',
-          year: '',
-          dept: '',
-          residenceType: 'Day Scholar',
-          hostelName: '',
-          roomNumber: '',
-          wardenName: '',
-          wardenPhone: '',
-        };
-
-  setLeader(emptyMember);
-  setMember1(emptyMember);
-  setMember2(emptyMember);
-  setMember3(emptyMember);
-  setMember4(emptyMember);
-      }
-    } catch (error: any) {
-      console.error('Registration error', error);
-      toast.error('Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // POST helper with exponential backoff retries
   const postWithRetry = async (url: string, body: any, idToken?: string) => {
     const maxAttempts = 5;
     const baseDelay = 400; // ms
@@ -244,22 +105,153 @@ const RegistrationForm = () => {
         });
 
         if (res.ok || (res.status >= 400 && res.status < 500)) {
-          // If success OR client error, stop retrying and return response
           return res;
         }
 
-        // For server errors (5xx), fallthrough to retry
         const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 100;
         await new Promise((r) => setTimeout(r, delay));
       } catch (err) {
-        // Network or CORS error: retry
         const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 100;
         await new Promise((r) => setTimeout(r, delay));
       }
     }
 
-    // If all attempts failed, return a fake Response-like object
     return new Response(null, { status: 503, statusText: 'Service Unavailable' });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!teamName.trim()) {
+      toast.error('Please enter a team name');
+      return;
+    }
+
+    const members = [leader, member1, member2, member3];
+
+    for (let i = 0; i < members.length; i++) {
+      const member = members[i];
+      if (!member.name || !member.regNo || !member.year || !member.dept) {
+        toast.error(`Please fill all fields for ${i === 0 ? 'Team Leader' : `Member ${i}`}`);
+        return;
+      }
+    }
+
+    for (let i = 0; i < members.length; i++) {
+      const m = members[i];
+      if (m.residenceType === 'Hosteller') {
+        if (!m.hostelName || !m.roomNumber || !m.wardenName || !m.wardenPhone) {
+          toast.error(`Please fill all hostel fields for ${i === 0 ? 'Team Leader' : `Member ${i}`}`);
+          return;
+        }
+      }
+    }
+
+    setLoading(true);
+
+    try {
+      // cooldown check
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        try {
+          const lastRef = ref(db, `userLastRegistration/${uid}`);
+          const lastSnap = await get(lastRef);
+          if (lastSnap.exists()) {
+            const lastVal = lastSnap.val();
+            const lastTs = typeof lastVal === 'number' ? lastVal : lastVal.lastRegisteredAt || 0;
+            const elapsed = Date.now() - lastTs;
+            const cooldown = 5 * 60 * 1000;
+            if (elapsed < cooldown) {
+              const remaining = cooldown - elapsed;
+              const mins = Math.floor(remaining / 60000);
+              const secs = Math.ceil((remaining % 60000) / 1000);
+              toast.info(`Registration already completed. Try again in ${mins}m ${secs}s`);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('Could not read last registration timestamp', err);
+        }
+      }
+
+      const payload: any = {
+        teamName: teamName.trim(),
+        members,
+        createdAt: new Date().toISOString(),
+      };
+
+      const env = (import.meta as any).env || {};
+      const endpoint = env.VITE_REGISTER_ENDPOINT || `${env.BASE_URL ?? '/'}api/registerTeam`;
+      const useDirect = !env.VITE_REGISTER_ENDPOINT;
+      const token = await auth.currentUser?.getIdToken();
+
+      let didSave = false;
+
+      if (useDirect) {
+        try {
+          await set(ref(db, 'teams/' + teamName.trim()), { members, createdAt: Date.now() });
+          didSave = true;
+        } catch (err) {
+          console.error('Direct DB write failed', err);
+          toast.error('Registration failed: could not save to database');
+        }
+      } else {
+        const res = await postWithRetry(endpoint, payload, token);
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          if (res.status === 503) {
+            try {
+              await set(ref(db, 'teams/' + teamName.trim()), { members, createdAt: Date.now() });
+              didSave = true;
+            } catch (err) {
+              console.error('Fallback DB write failed', err);
+              toast.error('Registration failed: ' + (text || res.statusText));
+            }
+          } else {
+            toast.error('Registration failed: ' + (text || res.statusText));
+          }
+        } else {
+          didSave = true;
+        }
+      }
+
+      if (didSave) {
+        toast.success('Team Registered Successfully!');
+        try {
+          const uid2 = auth.currentUser?.uid;
+          if (uid2) {
+            const lastRef2 = ref(db, `userLastRegistration/${uid2}`);
+            await set(lastRef2, { lastRegisteredAt: Date.now() });
+          }
+        } catch (err) {
+          console.warn('Could not write last registration timestamp', err);
+        }
+
+        setTeamName('');
+        const emptyMember: Member = {
+          name: '',
+          regNo: '',
+          year: '',
+          dept: '',
+          residenceType: 'Day Scholar',
+          hostelName: '',
+          roomNumber: '',
+          wardenName: '',
+          wardenPhone: '',
+        };
+
+        setLeader(emptyMember);
+        setMember1(emptyMember);
+        setMember2(emptyMember);
+        setMember3(emptyMember);
+      }
+    } catch (error: any) {
+      console.error('Registration error', error);
+      toast.error('Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderMemberFields = (
@@ -304,7 +296,6 @@ const RegistrationForm = () => {
           onChange={(e) => handleMemberChange(setter, 'dept', e.target.value)}
           required
         />
-        {/* Residence dropdown */}
         <select
           className="glow-input"
           value={member.residenceType}
@@ -329,7 +320,7 @@ const RegistrationForm = () => {
               className="glow-input"
               value={member.hostelName}
               onChange={(e) => handleMemberChange(setter, 'hostelName', e.target.value)}
-              required
+              required={member.residenceType === 'Hosteller'}
             />
             <input
               type="text"
@@ -337,7 +328,7 @@ const RegistrationForm = () => {
               className="glow-input"
               value={member.roomNumber}
               onChange={(e) => handleMemberChange(setter, 'roomNumber', e.target.value)}
-              required
+              required={member.residenceType === 'Hosteller'}
             />
             <input
               type="text"
@@ -345,7 +336,7 @@ const RegistrationForm = () => {
               className="glow-input"
               value={member.wardenName}
               onChange={(e) => handleMemberChange(setter, 'wardenName', e.target.value)}
-              required
+              required={member.residenceType === 'Hosteller'}
             />
             <input
               type="text"
@@ -353,7 +344,7 @@ const RegistrationForm = () => {
               className="glow-input"
               value={member.wardenPhone}
               onChange={(e) => handleMemberChange(setter, 'wardenPhone', e.target.value)}
-              required
+              required={member.residenceType === 'Hosteller'}
             />
           </div>
         </motion.div>
@@ -370,7 +361,7 @@ const RegistrationForm = () => {
         className="glass-card w-full max-w-4xl"
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="title-glow text-3xl">Team Registration (5 Members)</h2>
+          <h2 className="title-glow text-3xl">Team Registration (4 members)</h2>
           <button onClick={handleLogout} className="glow-btn text-sm px-4 py-2">
             Logout
           </button>
@@ -393,9 +384,6 @@ const RegistrationForm = () => {
             {renderMemberFields(member1, setMember1, 'Member 1')}
             {renderMemberFields(member2, setMember2, 'Member 2')}
             {renderMemberFields(member3, setMember3, 'Member 3')}
-            {renderMemberFields(member4, setMember4, 'Member 4')}
-
-            {/* global residence UI removed - per-member residence dropdowns are used instead */}
           </div>
 
           <button type="submit" className="glow-btn w-full mt-4" disabled={loading}>
@@ -407,4 +395,4 @@ const RegistrationForm = () => {
   );
 };
 
-export default RegistrationForm;
+export default RegistrationForm4;

@@ -5,7 +5,8 @@ import { AuthProvider } from './AuthContext';
 import NeuralNetworkBg from './components/NeuralNetworkBg';
 import SplashScreen from './components/SplashScreen';
 import Login from './components/Login';
-import RegistrationForm from './components/RegistrationForm';
+import RegistrationForm4 from './components/RegistrationForm4';
+import TeamRegistrationSelector from './components/TeamRegistrationSelector';
 import AdminDashboard from './components/AdminDashboard';
 import TeamDetail from './components/TeamDetail';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -22,7 +23,15 @@ function App() {
             path="/register"
             element={
               <ProtectedRoute adminOnly={false}>
-                <RegistrationForm />
+                <TeamRegistrationSelector />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/register4"
+            element={
+              <ProtectedRoute adminOnly={false}>
+                <RegistrationForm4 />
               </ProtectedRoute>
             }
           />
