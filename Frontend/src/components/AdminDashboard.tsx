@@ -25,6 +25,7 @@ interface Member {
 interface Team {
   teamName: string;
   members: Member[];
+  createdAt?: number;
 }
 
 interface AttendanceRow {
@@ -59,10 +60,21 @@ const AdminDashboard = () => {
         return;
       }
 
-      const processedTeams = Object.entries(data).map(([teamName, teamData]: [string, any]) => ({
-        teamName,
-        members: teamData.members || [],
-      }));
+      const processedTeams = Object.entries(data).map(([teamName, teamData]: [string, any]) => {
+        const rawCreated = teamData.createdAt;
+        const createdAt = typeof rawCreated === 'number'
+          ? rawCreated
+          : (typeof rawCreated === 'string' ? Date.parse(rawCreated) || 0 : 0);
+
+        return {
+          teamName,
+          members: teamData.members || [],
+          createdAt,
+        };
+      });
+
+      // Sort by createdAt ascending so the team that registered first appears first
+      processedTeams.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
       setTeams(processedTeams);
       setLoading(false);
