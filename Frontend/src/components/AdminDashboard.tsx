@@ -14,6 +14,7 @@ interface Member {
   regNo: string;
   year: string;
   dept: string;
+  phone: string;
   residenceType?: 'Day Scholar' | 'Hosteller';
   hostelName?: string;
   roomNumber?: string;
@@ -31,6 +32,7 @@ interface AttendanceRow {
   teamName: string;
   regNo: string;
   name: string;
+  phone: string;
   isFirstMember: boolean;
   residenceType?: string;
   hostelName?: string;
@@ -96,6 +98,7 @@ const AdminDashboard = () => {
           teamName: team.teamName,
           regNo: member.regNo,
           name: member.name,
+          phone: member.phone || '',
           isFirstMember: memberIndex === 0,
           residenceType: member.residenceType || 'Day Scholar',
           hostelName: member.hostelName || '',
@@ -117,11 +120,11 @@ const AdminDashboard = () => {
     }
 
     // CSV header with new residence/hostel columns
-    let csvContent = 'Team Number,Team Name,Reg Number,Name,Residence Type,Hostel Name,Room Number,Warden Name,Warden Phone\n';
+    let csvContent = exportTableConfig.headers.join(',') + '\n';
 
     attendanceRows.forEach((row) => {
       const escape = (s?: string) => `"${(s || '').replace(/"/g, '""')}"`;
-      csvContent += `${row.teamNumber},${escape(row.teamName)},${escape(row.regNo)},${escape(row.name)},${escape(row.residenceType)},${escape(row.hostelName)},${escape(row.roomNumber)},${escape(row.wardenName)},${escape(row.wardenPhone)}\n`;
+      csvContent += exportTableConfig.getData(row).map(val => escape(val)).join(',') + '\n';
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -129,7 +132,34 @@ const AdminDashboard = () => {
     toast.success('CSV exported successfully');
   };
 
-  const handleExportPDF = async () => {
+  const exportTableConfig = {
+  headers: [
+    'Team Number',
+    'Team Name',
+    'Register Number',
+    'Name',
+    'Residence Type',
+    'Phone Number',
+    'Hostel Name',
+    'Room Number',
+    'Warden Name',
+    'Warden Phone'
+  ],
+  getData: (row: AttendanceRow) => [
+    row.teamNumber.toString(),
+    row.teamName,
+    row.regNo,
+    row.name,
+    row.residenceType || 'Day Scholar',
+    row.phone || '',
+    row.hostelName || '',
+    row.roomNumber || '',
+    row.wardenName || '',
+    row.wardenPhone || ''
+  ]
+};
+
+const handleExportPDF = async () => {
     if (filteredTeams.length === 0) {
       toast.error('No teams to export');
       return;
@@ -163,30 +193,10 @@ const AdminDashboard = () => {
     doc.setFont('helvetica', 'normal');
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 35, { align: 'center' });
 
-    const tableData = attendanceRows.map((row) => [
-      row.teamNumber.toString(),
-      row.teamName,
-      row.regNo,
-      row.name,
-      row.residenceType || 'Day Scholar',
-      row.hostelName || '',
-      row.roomNumber || '',
-      row.wardenName || '',
-      row.wardenPhone || '',
-    ]);
+    const tableData = attendanceRows.map(row => exportTableConfig.getData(row));
 
     autoTable(doc, {
-      head: [[
-        'Team Number',
-        'Team Name',
-        'Reg Number',
-        'Name',
-        'Residence Type',
-        'Hostel Name',
-        'Room Number',
-        'Warden Name',
-        'Warden Phone'
-      ]],
+      head: [exportTableConfig.headers],
       body: tableData,
       startY: 40,
       theme: 'grid',
@@ -246,30 +256,10 @@ const AdminDashboard = () => {
     doc.setFont('helvetica', 'normal');
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 35, { align: 'center' });
 
-    const tableData = filteredRows.map((row) => [
-      row.teamNumber.toString(),
-      row.teamName,
-      row.regNo,
-      row.name,
-      row.residenceType || 'Day Scholar',
-      row.hostelName || '',
-      row.roomNumber || '',
-      row.wardenName || '',
-      row.wardenPhone || '',
-    ]);
+    const tableData = filteredRows.map(row => exportTableConfig.getData(row));
 
     autoTable(doc, {
-      head: [[
-        'Team Number',
-        'Team Name',
-        'Reg Number',
-        'Name',
-        'Residence Type',
-        'Hostel Name',
-        'Room Number',
-        'Warden Name',
-        'Warden Phone'
-      ]],
+      head: [exportTableConfig.headers],
       body: tableData,
       startY: 40,
       theme: 'grid',
